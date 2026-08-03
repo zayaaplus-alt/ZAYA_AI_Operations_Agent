@@ -100,6 +100,49 @@ Export execution history to JSON:
 python -m zaya_ai_operations_agent.cli agent export --output history.json
 ```
 
+## API Server
+
+The project also includes a FastAPI application for HTTP access to the agent.
+
+### Endpoints
+
+- GET /health - returns service health
+- GET /tasks - lists available tasks
+- POST /tasks/run - runs a task by name
+- GET /history - returns agent execution history
+
+### Run the API
+
+```bash
+uvicorn zaya_ai_operations_agent.api:app --reload
+```
+
+### API usage examples
+
+Check health:
+
+```bash
+curl http://127.0.0.1:8000/health
+```
+
+List tasks:
+
+```bash
+curl http://127.0.0.1:8000/tasks
+```
+
+Run a task:
+
+```bash
+curl -X POST http://127.0.0.1:8000/tasks/run -H "Content-Type: application/json" -d '{"task_name":"hello"}'
+```
+
+View history:
+
+```bash
+curl http://127.0.0.1:8000/history
+```
+
 ## Usage
 
 Run the system-info task:

@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "A modular Python AI Operations Agent project scaffold"
 readme = "README.md"
 requires-python = ">=3.10"
-dependencies = ["python-dotenv>=1.0"]
+dependencies = ["python-dotenv>=1.0", "fastapi>=0.110", "uvicorn>=0.27"]
 
 [project.optional-dependencies]
 dev = ["pytest>=8.0"]
