@@ -139,10 +139,10 @@ class ProjectStructureTest(unittest.TestCase):
             os.environ["API_ROLE"] = "admin"
             try:
                 request = type("Request", (), {"headers": {"x-api-key": "test-key"}})()
-                health_response = app.routes[0][2](request)
-                tasks_response = app.routes[1][2](request)
-                run_response = app.routes[2][2](type("Request", (), {"task_name": "hello"})(), request)
-                history_response = app.routes[3][2](request)
+                health_response = app.routes[2][2](request)
+                tasks_response = app.routes[3][2](request)
+                run_response = app.routes[4][2](type("Request", (), {"task_name": "hello"})(), request)
+                history_response = app.routes[5][2](request)
 
                 self.assertEqual(health_response["status"], "ok")
                 self.assertGreaterEqual(len(tasks_response), 1)
@@ -159,7 +159,7 @@ class ProjectStructureTest(unittest.TestCase):
         try:
             request = type("Request", (), {"headers": {}})()
             with self.assertRaises(Exception):
-                app.routes[0][2](request)
+                app.routes[2][2](request)
         finally:
             os.environ.pop("API_KEY", None)
             os.environ.pop("API_ROLE", None)
@@ -172,10 +172,10 @@ class ProjectStructureTest(unittest.TestCase):
             os.environ["API_ROLE"] = "admin"
             try:
                 request = type("Request", (), {"headers": {"x-api-key": "secret"}})()
-                app.routes[2][2](type("Request", (), {"task_name": "hello"})(), request)
-                history_response = app.routes[3][2](request)
-                task_history_response = app.routes[4][2]("hello", request)
-                delete_response = app.routes[5][2](request)
+                app.routes[4][2](type("Request", (), {"task_name": "hello"})(), request)
+                history_response = app.routes[5][2](request)
+                task_history_response = app.routes[6][2]("hello", request)
+                delete_response = app.routes[7][2](request)
 
                 self.assertGreaterEqual(len(history_response), 1)
                 self.assertGreaterEqual(len(task_history_response), 1)
@@ -185,13 +185,20 @@ class ProjectStructureTest(unittest.TestCase):
                 os.environ.pop("API_KEY", None)
                 os.environ.pop("API_ROLE", None)
 
+    def test_dashboard_routes_return_html(self) -> None:
+        root_response = app.routes[0][2]()
+        dashboard_response = app.routes[1][2]()
+
+        self.assertIn("ZAYA AI Operations Agent Dashboard", root_response)
+        self.assertIn("ZAYA AI Operations Agent Dashboard", dashboard_response)
+
     def test_viewer_cannot_execute_tasks(self) -> None:
         os.environ["API_KEY"] = "secret"
         os.environ["API_ROLE"] = "viewer"
         try:
             request = type("Request", (), {"headers": {"x-api-key": "secret"}})()
             with self.assertRaises(Exception):
-                app.routes[2][2](type("Request", (), {"task_name": "hello"})(), request)
+                app.routes[4][2](type("Request", (), {"task_name": "hello"})(), request)
         finally:
             os.environ.pop("API_KEY", None)
             os.environ.pop("API_ROLE", None)

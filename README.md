@@ -104,6 +104,23 @@ python -m zaya_ai_operations_agent.cli agent export --output history.json
 
 The project also includes a FastAPI application for HTTP access to the agent.
 
+## Dashboard
+
+The API serves a lightweight HTML dashboard at / and /dashboard. It shows:
+
+- system status,
+- registered tasks,
+- scheduled tasks,
+- recent execution history.
+
+The page auto-refreshes every 10 seconds. The dashboard is available without authentication, while the protected API endpoints still require an API key and role.
+
+Open the dashboard in a browser:
+
+```bash
+http://127.0.0.1:8000/
+```
+
 ### Endpoints
 
 - GET /health - returns service health

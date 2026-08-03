@@ -48,7 +48,9 @@ except ImportError:  # pragma: no cover - exercised when dependency is unavailab
 
 from .agent import Agent
 from .config import Settings
+from .dashboard import build_dashboard_html
 from .memory import MemoryStore
+from .scheduler import Scheduler
 from .tasks import TASK_REGISTRY, initialize_tasks
 
 
@@ -89,6 +91,16 @@ def require_access(path: str, request: Any = None) -> None:
     _, role = _get_request_context(request)
     if path not in ROLE_PERMISSIONS.get(role, set()):
         raise HTTPException(status_code=403, detail="Access denied")
+
+
+@app.get("/")
+def dashboard_root(request: Any = None) -> str:
+    return _build_dashboard_html(request)
+
+
+@app.get("/dashboard")
+def dashboard(request: Any = None) -> str:
+    return _build_dashboard_html(request)
 
 
 @app.get("/health")
@@ -151,3 +163,37 @@ def delete_history(request: Any = None) -> dict[str, str]:
     agent = Agent(memory_store=memory_store)
     agent.clear_history()
     return {"status": "deleted"}
+
+
+def _build_dashboard_html(request: Any = None) -> str:
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    agent = Agent(memory_store=memory_store)
+    initialize_tasks()
+    scheduler = Scheduler()
+    scheduled_tasks = [
+        {"task_name": item.task_name, "next_run_at": item.next_run_at.isoformat(), "active": item.active}
+        for item in scheduler.list_scheduled()
+    ]
+    history = [
+        {
+            "executed_at": record.executed_at,
+            "task_name": record.task_name,
+            "status": record.status,
+        }
+        for record in agent.history()[-5:]
+    ]
+    return build_dashboard_html(
+        {
+            "status": "ok",
+            "project_name": settings.project_name,
+            "log_level": settings.log_level,
+            "memory_file": str(settings.memory_file),
+            "tasks": [
+                {"name": name, "description": task.description}
+                for name, task in sorted(TASK_REGISTRY.items())
+            ],
+            "scheduled_tasks": scheduled_tasks,
+            "history": history,
+        }
+    )
