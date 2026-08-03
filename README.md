@@ -104,6 +104,30 @@ python -m zaya_ai_operations_agent.cli agent export --output history.json
 
 The project also includes a FastAPI application for HTTP access to the agent.
 
+## Multi-Agent Orchestration
+
+The project now includes a modular multi-agent orchestration layer with three specialist agents:
+
+- PlannerAgent: creates an execution plan from a task name
+- ExecutorAgent: runs the task through the existing task registry
+- ReviewerAgent: validates the result before the run is marked successful
+
+The AgentManager coordinates them and records every execution in the shared history store.
+
+### Agent API endpoints
+
+List available agents:
+
+```bash
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/agents
+```
+
+Run a multi-agent workflow:
+
+```bash
+curl -X POST http://127.0.0.1:8000/agents/run -H "Content-Type: application/json" -H "x-api-key: your-secret-key" -d '{"task_name":"hello","user_role":"admin"}'
+```
+
 ## Dashboard
 
 The API serves a lightweight HTML dashboard at / and /dashboard. It shows:

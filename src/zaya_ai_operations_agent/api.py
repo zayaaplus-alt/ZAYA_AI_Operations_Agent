@@ -50,6 +50,7 @@ from .agent import Agent
 from .config import Settings
 from .dashboard import build_dashboard_html
 from .memory import MemoryStore
+from .orchestrator import AgentManager
 from .scheduler import Scheduler
 from .tasks import TASK_REGISTRY, initialize_tasks
 
@@ -133,6 +134,35 @@ def run_task(request: TaskRunRequest, auth_request: Any = None) -> dict[str, Any
         raise HTTPException(status_code=404, detail=str(exc)) from exc
 
     return {"plan": plan, "record": record.__dict__ if hasattr(record, "__dict__") else {"task_name": record.task_name, "status": record.status, "details": record.details, "executed_at": record.executed_at}}
+
+
+@app.get("/agents")
+def list_agents(request: Any = None) -> list[dict[str, str]]:
+    require_access("health", request)
+    return [
+        {"name": "PlannerAgent", "role": "planner"},
+        {"name": "ExecutorAgent", "role": "executor"},
+        {"name": "ReviewerAgent", "role": "reviewer"},
+    ]
+
+
+@app.post("/agents/run")
+def run_agent(request: Any = None, auth_request: Any = None) -> dict[str, Any]:
+    require_access("tasks/run", auth_request or request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = AgentManager(memory_store=memory_store)
+    payload = getattr(request, "json", lambda: {})() if hasattr(request, "json") else {}
+    task_name = payload.get("task_name", "hello")
+    user_role = payload.get("user_role", "viewer")
+    result = manager.run(task_name, user_role=user_role)
+    return {
+        "planner_plan": result.planner_plan,
+        "executor_result": result.executor_result,
+        "reviewer_result": result.reviewer_result,
+        "status": result.status,
+        "executed_at": result.executed_at,
+    }
 
 
 @app.get("/history")

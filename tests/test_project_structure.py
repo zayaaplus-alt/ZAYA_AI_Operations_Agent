@@ -12,11 +12,30 @@ from zaya_ai_operations_agent.api import app
 from zaya_ai_operations_agent.cli import build_parser, run_task
 from zaya_ai_operations_agent.config import Settings
 from zaya_ai_operations_agent.memory import MemoryStore
+from zaya_ai_operations_agent.orchestrator import AgentManager
 from zaya_ai_operations_agent.scheduler import Scheduler
 from zaya_ai_operations_agent.tasks import TASK_REGISTRY, get_task, initialize_tasks
 
 
 class ProjectStructureTest(unittest.TestCase):
+    def _match_route(self, route_path: str, requested_path: str) -> bool:
+        route_parts = route_path.split("/")
+        requested_parts = requested_path.split("/")
+        if len(route_parts) != len(requested_parts):
+            return False
+        for route_part, requested_part in zip(route_parts, requested_parts):
+            if route_part.startswith("{") and route_part.endswith("}"):
+                continue
+            if route_part != requested_part:
+                return False
+        return True
+
+    def _get_route(self, method: str, path: str):
+        for route_method, route_path, handler in app.routes:
+            if route_method == method and self._match_route(route_path, path):
+                return handler
+        self.fail(f"Route {method} {path} not found")
+
     def test_package_modules_are_importable(self) -> None:
         modules = [
             "zaya_ai_operations_agent.config",
@@ -139,10 +158,10 @@ class ProjectStructureTest(unittest.TestCase):
             os.environ["API_ROLE"] = "admin"
             try:
                 request = type("Request", (), {"headers": {"x-api-key": "test-key"}})()
-                health_response = app.routes[2][2](request)
-                tasks_response = app.routes[3][2](request)
-                run_response = app.routes[4][2](type("Request", (), {"task_name": "hello"})(), request)
-                history_response = app.routes[5][2](request)
+                health_response = self._get_route("GET", "/health")(request)
+                tasks_response = self._get_route("GET", "/tasks")(request)
+                run_response = self._get_route("POST", "/tasks/run")(type("Request", (), {"task_name": "hello"})(), request)
+                history_response = self._get_route("GET", "/history")(request)
 
                 self.assertEqual(health_response["status"], "ok")
                 self.assertGreaterEqual(len(tasks_response), 1)
@@ -159,7 +178,7 @@ class ProjectStructureTest(unittest.TestCase):
         try:
             request = type("Request", (), {"headers": {}})()
             with self.assertRaises(Exception):
-                app.routes[2][2](request)
+                self._get_route("GET", "/health")(request)
         finally:
             os.environ.pop("API_KEY", None)
             os.environ.pop("API_ROLE", None)
@@ -172,10 +191,10 @@ class ProjectStructureTest(unittest.TestCase):
             os.environ["API_ROLE"] = "admin"
             try:
                 request = type("Request", (), {"headers": {"x-api-key": "secret"}})()
-                app.routes[4][2](type("Request", (), {"task_name": "hello"})(), request)
-                history_response = app.routes[5][2](request)
-                task_history_response = app.routes[6][2]("hello", request)
-                delete_response = app.routes[7][2](request)
+                self._get_route("POST", "/tasks/run")(type("Request", (), {"task_name": "hello"})(), request)
+                history_response = self._get_route("GET", "/history")(request)
+                task_history_response = self._get_route("GET", "/history/hello")("hello", request)
+                delete_response = self._get_route("DELETE", "/history")(request)
 
                 self.assertGreaterEqual(len(history_response), 1)
                 self.assertGreaterEqual(len(task_history_response), 1)
@@ -186,11 +205,36 @@ class ProjectStructureTest(unittest.TestCase):
                 os.environ.pop("API_ROLE", None)
 
     def test_dashboard_routes_return_html(self) -> None:
-        root_response = app.routes[0][2]()
-        dashboard_response = app.routes[1][2]()
+        root_response = self._get_route("GET", "/")()
+        dashboard_response = self._get_route("GET", "/dashboard")()
 
         self.assertIn("ZAYA AI Operations Agent Dashboard", root_response)
         self.assertIn("ZAYA AI Operations Agent Dashboard", dashboard_response)
+
+    def test_agent_manager_runs_planner_executor_and_reviewer(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            memory_store = MemoryStore(Path(temp_dir) / "memory.json")
+            manager = AgentManager(memory_store=memory_store)
+            result = manager.run("hello", user_role="operator")
+
+            self.assertEqual(result.planner_plan, ["hello"])
+            self.assertEqual(result.status, "success")
+            self.assertIn("Review passed", result.reviewer_result)
+            self.assertGreaterEqual(len(manager.agent.history()), 1)
+
+    def test_agents_api_endpoints(self) -> None:
+        os.environ["API_KEY"] = "secret"
+        os.environ["API_ROLE"] = "admin"
+        try:
+            request = type("Request", (), {"headers": {"x-api-key": "secret"}, "json": lambda self: {"task_name": "hello", "user_role": "admin"}})()
+            agents_response = self._get_route("GET", "/agents")(request)
+            run_response = self._get_route("POST", "/agents/run")(request)
+
+            self.assertGreaterEqual(len(agents_response), 3)
+            self.assertEqual(run_response["status"], "success")
+        finally:
+            os.environ.pop("API_KEY", None)
+            os.environ.pop("API_ROLE", None)
 
     def test_viewer_cannot_execute_tasks(self) -> None:
         os.environ["API_KEY"] = "secret"
@@ -198,7 +242,7 @@ class ProjectStructureTest(unittest.TestCase):
         try:
             request = type("Request", (), {"headers": {"x-api-key": "secret"}})()
             with self.assertRaises(Exception):
-                app.routes[4][2](type("Request", (), {"task_name": "hello"})(), request)
+                self._get_route("POST", "/tasks/run")(type("Request", (), {"task_name": "hello"})(), request)
         finally:
             os.environ.pop("API_KEY", None)
             os.environ.pop("API_ROLE", None)
