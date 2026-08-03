@@ -2,12 +2,14 @@ import importlib
 import os
 import unittest
 from contextlib import redirect_stdout
+from datetime import datetime, timedelta
 from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
 from zaya_ai_operations_agent.cli import build_parser, run_task
 from zaya_ai_operations_agent.config import Settings
+from zaya_ai_operations_agent.scheduler import Scheduler
 from zaya_ai_operations_agent.tasks import TASK_REGISTRY, get_task, initialize_tasks
 
 
@@ -73,6 +75,29 @@ class ProjectStructureTest(unittest.TestCase):
             self.assertEqual(settings.openai_api_key, "sk-test")
             self.assertEqual(settings.log_level, "DEBUG")
             self.assertEqual(settings.memory_file, Path("/tmp/custom-memory.json"))
+
+    def test_scheduler_supports_one_time_and_recurring_tasks(self) -> None:
+        scheduler = Scheduler()
+        one_time = scheduler.schedule_task("hello", run_once=True, start_at=datetime.now() - timedelta(seconds=1))
+        recurring = scheduler.schedule_task("hello", interval_seconds=30, start_at=datetime.now() - timedelta(seconds=1))
+
+        self.assertTrue(one_time.should_run())
+        self.assertTrue(recurring.should_run())
+
+        completed = scheduler.run_due_tasks(current_time=datetime.now())
+        self.assertEqual(len(completed), 2)
+        self.assertFalse(one_time.active)
+        self.assertTrue(recurring.active)
+
+    def test_cli_supports_schedule_and_list_commands(self) -> None:
+        parser = build_parser()
+        schedule_args = parser.parse_args(["schedule", "--task", "hello", "--once"])
+        list_args = parser.parse_args(["list-scheduled"])
+
+        self.assertEqual(schedule_args.command, "schedule")
+        self.assertEqual(schedule_args.task, "hello")
+        self.assertTrue(schedule_args.once)
+        self.assertEqual(list_args.command, "list-scheduled")
 
     def test_settings_uses_defaults_when_env_missing(self) -> None:
         with TemporaryDirectory() as temp_dir:

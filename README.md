@@ -35,13 +35,43 @@ Built-in example tasks:
 - hello: prints a friendly greeting
 - system-info: prints basic system information
 
-## Usage
+## Scheduler
 
-Run the hello task:
+The project includes a simple scheduler module for one-time and recurring tasks. It integrates with the existing task registry, so any discovered task can be scheduled.
+
+### CLI commands
+
+Run a task immediately:
 
 ```bash
 python -m zaya_ai_operations_agent.cli run --task hello
 ```
+
+Schedule a one-time task:
+
+```bash
+python -m zaya_ai_operations_agent.cli schedule --task hello --once
+```
+
+Schedule a recurring task every 60 seconds:
+
+```bash
+python -m zaya_ai_operations_agent.cli schedule --task hello --interval 60
+```
+
+Schedule a recurring task every 2 minutes:
+
+```bash
+python -m zaya_ai_operations_agent.cli schedule --task hello --minutes 2
+```
+
+List scheduled tasks:
+
+```bash
+python -m zaya_ai_operations_agent.cli list-scheduled
+```
+
+## Usage
 
 Run the system-info task:
 
