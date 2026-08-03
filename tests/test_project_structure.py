@@ -7,8 +7,10 @@ from io import StringIO
 from pathlib import Path
 from tempfile import TemporaryDirectory
 
+from zaya_ai_operations_agent.agent import Agent
 from zaya_ai_operations_agent.cli import build_parser, run_task
 from zaya_ai_operations_agent.config import Settings
+from zaya_ai_operations_agent.memory import MemoryStore
 from zaya_ai_operations_agent.scheduler import Scheduler
 from zaya_ai_operations_agent.tasks import TASK_REGISTRY, get_task, initialize_tasks
 
@@ -98,6 +100,34 @@ class ProjectStructureTest(unittest.TestCase):
         self.assertEqual(schedule_args.task, "hello")
         self.assertTrue(schedule_args.once)
         self.assertEqual(list_args.command, "list-scheduled")
+
+    def test_agent_can_plan_execute_and_export_history(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            memory_path = Path(temp_dir) / "memory.json"
+            memory_store = MemoryStore(memory_path)
+            agent = Agent(memory_store=memory_store)
+
+            plan = agent.plan("hello")
+            record = agent.execute("hello")
+            export_path = agent.export_history(Path(temp_dir) / "history.json")
+
+            self.assertEqual(plan, ["hello"])
+            self.assertEqual(record.task_name, "hello")
+            self.assertEqual(record.status, "completed")
+            self.assertEqual(len(agent.history()), 1)
+            self.assertTrue(export_path.exists())
+            self.assertIn("hello", export_path.read_text(encoding="utf-8"))
+
+    def test_agent_cli_parser_supports_subcommands(self) -> None:
+        parser = build_parser()
+        agent_run_args = parser.parse_args(["agent", "run", "--task", "hello"])
+        agent_history_args = parser.parse_args(["agent", "history"])
+        agent_export_args = parser.parse_args(["agent", "export", "--output", "history.json"])
+
+        self.assertEqual(agent_run_args.command, "agent")
+        self.assertEqual(agent_run_args.agent_command, "run")
+        self.assertEqual(agent_history_args.agent_command, "history")
+        self.assertEqual(agent_export_args.agent_command, "export")
 
     def test_settings_uses_defaults_when_env_missing(self) -> None:
         with TemporaryDirectory() as temp_dir:

@@ -71,6 +71,35 @@ List scheduled tasks:
 python -m zaya_ai_operations_agent.cli list-scheduled
 ```
 
+## Agent Framework
+
+The project includes a lightweight AI agent framework built on top of the task registry, scheduler, and memory store. The agent can:
+
+- plan a task,
+- execute a task,
+- keep a history of previous executions,
+- export execution logs to JSON.
+
+### Agent CLI commands
+
+Run an agent task:
+
+```bash
+python -m zaya_ai_operations_agent.cli agent run --task hello
+```
+
+Show execution history:
+
+```bash
+python -m zaya_ai_operations_agent.cli agent history
+```
+
+Export execution history to JSON:
+
+```bash
+python -m zaya_ai_operations_agent.cli agent export --output history.json
+```
+
 ## Usage
 
 Run the system-info task:
