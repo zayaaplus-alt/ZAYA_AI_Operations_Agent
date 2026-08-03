@@ -12,6 +12,7 @@ from zaya_ai_operations_agent.api import app
 from zaya_ai_operations_agent.cli import build_parser, run_task
 from zaya_ai_operations_agent.config import Settings
 from zaya_ai_operations_agent.memory import MemoryStore
+from zaya_ai_operations_agent.knowledge import KnowledgeManager, SimpleEmbedding, VectorStore
 from zaya_ai_operations_agent.orchestrator import AgentManager
 from zaya_ai_operations_agent.scheduler import Scheduler
 from zaya_ai_operations_agent.tasks import TASK_REGISTRY, get_task, initialize_tasks
@@ -275,6 +276,42 @@ class ProjectStructureTest(unittest.TestCase):
         finally:
             os.environ.pop("API_KEY", None)
             os.environ.pop("API_ROLE", None)
+
+    def test_knowledge_manager_ingests_documents_and_supports_search(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            document_path = Path(temp_dir) / "notes.md"
+            document_path.write_text("# Hello knowledge base\nThis is an example document for search.", encoding="utf-8")
+            memory_store = MemoryStore(Path(temp_dir) / "knowledge.json")
+            manager = KnowledgeManager(memory_store=memory_store, embedding=SimpleEmbedding(), vector_store=VectorStore())
+            document = manager.ingest_document(document_path, title="Notes", metadata={"source": "test"})
+
+            self.assertEqual(document.file_type, "md")
+            self.assertEqual(document.title, "Notes")
+            self.assertGreaterEqual(len(manager.list_documents()), 1)
+            self.assertGreaterEqual(len(manager.search("example", top_k=3)), 1)
+            manager.delete_document(document.id)
+            self.assertEqual(len(manager.list_documents()), 0)
+
+    def test_knowledge_api_endpoints(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            document_path = Path(temp_dir) / "notes.txt"
+            document_path.write_text("Knowledge API test content", encoding="utf-8")
+            os.environ["API_KEY"] = "secret"
+            os.environ["API_ROLE"] = "admin"
+            try:
+                request = type("Request", (), {"headers": {"x-api-key": "secret"}, "json": lambda self: {"path": str(document_path), "title": "Notes", "metadata": {"source": "test"}}})()
+                upload_response = self._get_route("POST", "/knowledge/upload")(request)
+                documents_response = self._get_route("GET", "/knowledge/documents")(request)
+                search_response = self._get_route("GET", "/knowledge/search")(type("Request", (), {"headers": {"x-api-key": "secret"}, "json": lambda self: {"query": "content", "top_k": 3}})())
+                delete_response = self._get_route("DELETE", "/knowledge/document/example")("example", request)
+
+                self.assertEqual(upload_response["title"], "Notes")
+                self.assertGreaterEqual(len(documents_response), 1)
+                self.assertIsInstance(search_response, list)
+                self.assertEqual(delete_response["status"], "deleted")
+            finally:
+                os.environ.pop("API_KEY", None)
+                os.environ.pop("API_ROLE", None)
 
     def test_viewer_cannot_execute_tasks(self) -> None:
         os.environ["API_KEY"] = "secret"

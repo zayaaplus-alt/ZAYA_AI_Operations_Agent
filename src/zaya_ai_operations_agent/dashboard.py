@@ -22,6 +22,10 @@ def build_dashboard_html(data: dict[str, Any]) -> str:
         f"<li>{html.escape(item['name'])}: {html.escape(', '.join(item.get('steps', [])))}</li>"
         for item in data.get("workflows", [])
     )
+    knowledge_documents = "".join(
+        f"<li>{html.escape(item['title'])} ({html.escape(item.get('file_type', ''))})</li>"
+        for item in data.get("knowledge_documents", [])
+    )
 
     return f"""<!DOCTYPE html>
 <html lang=\"en\">
@@ -61,6 +65,11 @@ def build_dashboard_html(data: dict[str, Any]) -> str:
   <section>
     <h2>Workflow Definitions</h2>
     <ul>{workflows or '<li>No workflows defined</li>'}</ul>
+  </section>
+
+  <section>
+    <h2>Knowledge Base</h2>
+    <ul>{knowledge_documents or '<li>No documents ingested</li>'}</ul>
   </section>
 
   <section>

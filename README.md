@@ -181,6 +181,37 @@ Inspect workflow execution history:
 curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/workflows/history
 ```
 
+## Knowledge Base and Memory
+
+The project now includes a modular knowledge base layer for ingesting and searching documents.
+
+### Capabilities
+
+- document ingestion from Markdown, TXT, and PDF-like text files
+- document metadata and timestamps
+- chunking for long content
+- vector storage abstraction with a pluggable embedding interface
+- semantic-style search over indexed chunks
+
+### Example knowledge upload
+
+```bash
+curl -X POST http://127.0.0.1:8000/knowledge/upload -H "Content-Type: application/json" -H "x-api-key: your-secret-key" -d '{"path":"/path/to/notes.md","title":"Notes","metadata":{"source":"internal"}}'
+```
+
+### Search and document listing
+
+```bash
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/knowledge/search?query=example
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/knowledge/documents
+```
+
+### Delete a document
+
+```bash
+curl -X DELETE http://127.0.0.1:8000/knowledge/document/<document-id> -H "x-api-key: your-secret-key"
+```
+
 ## Dashboard
 
 The API serves a lightweight HTML dashboard at / and /dashboard. It shows:

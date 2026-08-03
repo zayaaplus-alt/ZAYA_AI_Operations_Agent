@@ -49,6 +49,7 @@ except ImportError:  # pragma: no cover - exercised when dependency is unavailab
 from .agent import Agent
 from .config import Settings
 from .dashboard import build_dashboard_html
+from .knowledge import KnowledgeManager
 from .memory import MemoryStore
 from .orchestrator import AgentManager
 from .scheduler import Scheduler
@@ -58,9 +59,9 @@ from .workflows import RetryPolicy, Workflow, WorkflowManager, WorkflowStep
 
 ALLOWED_ROLES = {"admin", "operator", "viewer"}
 ROLE_PERMISSIONS = {
-    "admin": {"health", "tasks", "tasks/run", "history", "workflows", "workflows/run"},
-    "operator": {"health", "tasks", "tasks/run", "history", "workflows", "workflows/run"},
-    "viewer": {"health", "tasks", "history", "workflows"},
+    "admin": {"health", "tasks", "tasks/run", "history", "workflows", "workflows/run", "knowledge", "knowledge/upload", "knowledge/search", "knowledge/documents"},
+    "operator": {"health", "tasks", "tasks/run", "history", "workflows", "workflows/run", "knowledge", "knowledge/upload", "knowledge/search", "knowledge/documents"},
+    "viewer": {"health", "tasks", "history", "workflows", "knowledge", "knowledge/search", "knowledge/documents"},
 }
 
 
@@ -271,6 +272,52 @@ def workflow_history(request: Any = None) -> list[dict[str, Any]]:
     return [record.__dict__ if hasattr(record, "__dict__") else {"task_name": record.task_name, "status": record.status, "user_role": getattr(record, "user_role", "viewer"), "execution_duration_seconds": getattr(record, "execution_duration_seconds", 0.0), "details": record.details, "executed_at": record.executed_at} for record in manager.history()]
 
 
+@app.post("/knowledge/upload")
+def upload_knowledge(request: Any = None) -> dict[str, Any]:
+    require_access("knowledge/upload", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = KnowledgeManager(memory_store=memory_store)
+    payload = _get_json_payload(request)
+    path = payload.get("path")
+    title = payload.get("title")
+    metadata = payload.get("metadata") or {}
+    if not path:
+        raise HTTPException(status_code=400, detail="Path is required")
+    document = manager.ingest_document(path, title=title, metadata=metadata)
+    return {"id": document.id, "title": document.title, "file_type": document.file_type, "created_at": document.created_at}
+
+
+@app.get("/knowledge/search")
+def search_knowledge(request: Any = None) -> list[dict[str, Any]]:
+    require_access("knowledge/search", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = KnowledgeManager(memory_store=memory_store)
+    payload = _get_json_payload(request)
+    query = payload.get("query") or ""
+    return manager.search(query, top_k=payload.get("top_k", 5))
+
+
+@app.get("/knowledge/documents")
+def list_knowledge_documents(request: Any = None) -> list[dict[str, Any]]:
+    require_access("knowledge/documents", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = KnowledgeManager(memory_store=memory_store)
+    return manager.list_documents()
+
+
+@app.delete("/knowledge/document/{document_id}")
+def delete_knowledge_document(document_id: str, request: Any = None) -> dict[str, Any]:
+    require_access("knowledge/documents", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = KnowledgeManager(memory_store=memory_store)
+    manager.delete_document(document_id)
+    return {"status": "deleted", "id": document_id}
+
+
 def _build_dashboard_html(request: Any = None) -> str:
     settings = Settings()
     memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
@@ -297,6 +344,8 @@ def _build_dashboard_html(request: Any = None) -> str:
         }
         for workflow in workflow_manager.list_workflows()
     ]
+    knowledge_manager = KnowledgeManager(memory_store=memory_store)
+    knowledge_documents = knowledge_manager.list_documents()
     return build_dashboard_html(
         {
             "status": "ok",
@@ -310,5 +359,6 @@ def _build_dashboard_html(request: Any = None) -> str:
             "scheduled_tasks": scheduled_tasks,
             "history": history,
             "workflows": workflows,
+            "knowledge_documents": knowledge_documents,
         }
     )
