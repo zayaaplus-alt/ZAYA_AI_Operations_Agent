@@ -1,4 +1,5 @@
 import importlib
+import os
 import unittest
 from contextlib import redirect_stdout
 from io import StringIO
@@ -47,6 +48,37 @@ class ProjectStructureTest(unittest.TestCase):
                 run_task("hello", settings=settings)
 
             self.assertIn("Hello from the AI Operations Agent", output.getvalue())
+
+    def test_settings_loads_values_from_env_file(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            env_file = Path(temp_dir) / ".env"
+            env_file.write_text(
+                "OPENAI_API_KEY=sk-test\nLOG_LEVEL=DEBUG\nMEMORY_FILE=/tmp/custom-memory.json\n",
+                encoding="utf-8",
+            )
+
+            settings = Settings(env_file=env_file)
+
+            self.assertEqual(settings.openai_api_key, "sk-test")
+            self.assertEqual(settings.log_level, "DEBUG")
+            self.assertEqual(settings.memory_file, Path("/tmp/custom-memory.json"))
+
+    def test_settings_uses_defaults_when_env_missing(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            env_file = Path(temp_dir) / ".env"
+            env_file.write_text("", encoding="utf-8")
+
+            original_env = os.environ.copy()
+            os.environ.clear()
+            try:
+                settings = Settings(data_dir=Path(temp_dir), memory_file=None, env_file=env_file)
+            finally:
+                os.environ.clear()
+                os.environ.update(original_env)
+
+            self.assertIsNone(settings.openai_api_key)
+            self.assertEqual(settings.log_level, "INFO")
+            self.assertEqual(settings.memory_file, Path(temp_dir) / "memory.json")
 
 
 if __name__ == "__main__":

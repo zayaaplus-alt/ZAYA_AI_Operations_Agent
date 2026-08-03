@@ -10,6 +10,22 @@ A clean, modular Python scaffold for an AI Operations Agent with separate module
 - src/zaya_ai_operations_agent/memory.py - JSON-backed memory store
 - src/zaya_ai_operations_agent/cli.py - CLI entry point and parser
 
+## Configuration
+
+The project loads configuration from a dotenv file named .env if present. A sample file is included at [.env.example](.env.example).
+
+Supported variables:
+
+- OPENAI_API_KEY: API key for OpenAI-backed integrations
+- LOG_LEVEL: logging verbosity such as INFO, DEBUG, WARNING
+- MEMORY_FILE: optional path for the JSON memory store
+
+Example:
+
+```bash
+cp .env.example .env
+```
+
 ## Usage
 
 Run the default task:
