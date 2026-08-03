@@ -7,7 +7,7 @@ from typing import Optional
 from .config import Settings
 from .logging_utils import get_logger
 from .memory import MemoryStore
-from .tasks import Task, create_hello_task
+from .tasks import Task, get_task
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -25,13 +25,8 @@ def run_task(task_name: str, settings: Optional[Settings] = None) -> None:
     memory = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
 
     logger.info("Starting task: %s", task_name)
-    task_map: dict[str, Task] = {"hello": create_hello_task()}
 
-    try:
-        task = task_map[task_name]
-    except KeyError as exc:
-        raise KeyError(f"Unknown task: {task_name}") from exc
-
+    task: Task = get_task(task_name)
     task.run()
     memory.set("last_task", task_name)
     logger.info("Completed task: %s", task_name)
