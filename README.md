@@ -212,6 +212,33 @@ curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/knowledge/documents
 curl -X DELETE http://127.0.0.1:8000/knowledge/document/<document-id> -H "x-api-key: your-secret-key"
 ```
 
+## LLM Provider System
+
+The project now includes a modular LLM provider layer with a provider interface and implementations for OpenAI, Anthropic, Google Gemini, and Ollama.
+
+### Configuration
+
+Supported environment variables:
+
+- LLM_PROVIDER: selects the active provider (`mock`, `openai`, `anthropic`, `gemini`, `ollama`)
+- LLM_MODEL: model name passed to the provider
+- OPENAI_API_KEY: API key for OpenAI
+- ANTHROPIC_API_KEY: API key for Anthropic
+- GEMINI_API_KEY: API key for Gemini
+- OLLAMA_BASE_URL: base URL for Ollama
+
+### Provider API
+
+List the configured providers:
+
+```bash
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/llm/providers
+```
+
+### Notes
+
+Unit tests use a mock provider and do not make real external API calls.
+
 ## Dashboard
 
 The API serves a lightweight HTML dashboard at / and /dashboard. It shows:

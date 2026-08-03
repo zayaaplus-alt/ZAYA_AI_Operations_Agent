@@ -6,6 +6,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Optional
 
+from .llm import LLMProviderFactory
 from .memory import MemoryStore
 from .scheduler import Scheduler
 from .tasks import Task, get_task
@@ -26,9 +27,10 @@ class ExecutionRecord:
 class Agent:
     """A simple agent framework for planning and executing tasks."""
 
-    def __init__(self, memory_store: Optional[MemoryStore] = None, scheduler: Optional[Scheduler] = None) -> None:
+    def __init__(self, memory_store: Optional[MemoryStore] = None, scheduler: Optional[Scheduler] = None, llm_provider: Optional[Any] = None) -> None:
         self.memory_store = memory_store
         self.scheduler = scheduler or Scheduler()
+        self.llm_provider = llm_provider or LLMProviderFactory.create()
         self._history: list[ExecutionRecord] = []
 
     def _get_memory(self) -> MemoryStore:
@@ -37,6 +39,7 @@ class Agent:
         return self.memory_store
 
     def plan(self, task_name: str) -> list[str]:
+        self.llm_provider.generate(f"Plan task {task_name}")
         return [task_name]
 
     def execute(self, task_name: str, user_role: str = "viewer", execution_duration_seconds: float = 0.0) -> ExecutionRecord:

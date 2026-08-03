@@ -36,6 +36,8 @@ class Settings:
     data_dir: Path = field(default_factory=lambda: Path("~/.zaya_ai_operations_agent").expanduser())
     memory_file: Optional[Path] = None
     openai_api_key: Optional[str] = None
+    llm_provider: Optional[str] = None
+    llm_model: Optional[str] = None
     env_file: Optional[Path] = None
 
     def __post_init__(self) -> None:
@@ -52,6 +54,12 @@ class Settings:
 
         if self.log_level == "INFO" and env_values.get("LOG_LEVEL"):
             self.log_level = env_values.get("LOG_LEVEL", self.log_level)
+
+        if self.llm_provider is None:
+            self.llm_provider = env_values.get("LLM_PROVIDER") or "mock"
+
+        if self.llm_model is None:
+            self.llm_model = env_values.get("LLM_MODEL") or "default"
 
         if self.memory_file is None:
             custom_memory = env_values.get("MEMORY_FILE")

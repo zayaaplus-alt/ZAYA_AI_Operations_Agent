@@ -5,6 +5,7 @@ from datetime import datetime
 from typing import Optional
 
 from .agent import Agent, ExecutionRecord
+from .llm import LLMProviderFactory
 from .memory import MemoryStore
 from .tasks import Task, get_task
 
@@ -46,11 +47,11 @@ class ReviewerAgent:
 class AgentManager:
     """Coordinates planner, executor, and reviewer agents."""
 
-    def __init__(self, memory_store: Optional[MemoryStore] = None) -> None:
+    def __init__(self, memory_store: Optional[MemoryStore] = None, llm_provider: Optional[Any] = None) -> None:
         self.planner = PlannerAgent()
         self.executor = ExecutorAgent()
         self.reviewer = ReviewerAgent()
-        self.agent = Agent(memory_store=memory_store)
+        self.agent = Agent(memory_store=memory_store, llm_provider=llm_provider or LLMProviderFactory.create())
 
     def run(self, task_name: str, user_role: str = "viewer") -> AgentRunResult:
         plan = self.planner.plan(task_name)

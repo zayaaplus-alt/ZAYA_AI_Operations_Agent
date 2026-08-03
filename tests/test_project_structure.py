@@ -13,6 +13,7 @@ from zaya_ai_operations_agent.cli import build_parser, run_task
 from zaya_ai_operations_agent.config import Settings
 from zaya_ai_operations_agent.memory import MemoryStore
 from zaya_ai_operations_agent.knowledge import KnowledgeManager, SimpleEmbedding, VectorStore
+from zaya_ai_operations_agent.llm import AnthropicProvider, GeminiProvider, LLMProviderFactory, MockLLMProvider, OllamaProvider, OpenAIProvider
 from zaya_ai_operations_agent.orchestrator import AgentManager
 from zaya_ai_operations_agent.scheduler import Scheduler
 from zaya_ai_operations_agent.tasks import TASK_REGISTRY, get_task, initialize_tasks
@@ -312,6 +313,31 @@ class ProjectStructureTest(unittest.TestCase):
             finally:
                 os.environ.pop("API_KEY", None)
                 os.environ.pop("API_ROLE", None)
+
+    def test_llm_provider_factory_and_api_endpoint(self) -> None:
+        settings = LLMProviderFactory.load_settings()
+        provider = LLMProviderFactory.create(settings, "mock")
+        self.assertIsInstance(provider, MockLLMProvider)
+        self.assertIn("mock-response", provider.generate("hello"))
+
+        openai_provider = OpenAIProvider("token")
+        anthropic_provider = AnthropicProvider("token")
+        gemini_provider = GeminiProvider("token")
+        ollama_provider = OllamaProvider("http://example")
+        self.assertIn("openai", openai_provider.generate("hello"))
+        self.assertIn("anthropic", anthropic_provider.generate("hello"))
+        self.assertIn("gemini", gemini_provider.generate("hello"))
+        self.assertIn("ollama", ollama_provider.generate("hello"))
+
+        os.environ["API_KEY"] = "secret"
+        os.environ["API_ROLE"] = "admin"
+        try:
+            request = type("Request", (), {"headers": {"x-api-key": "secret"}})()
+            providers_response = self._get_route("GET", "/llm/providers")(request)
+            self.assertGreaterEqual(len(providers_response), 5)
+        finally:
+            os.environ.pop("API_KEY", None)
+            os.environ.pop("API_ROLE", None)
 
     def test_viewer_cannot_execute_tasks(self) -> None:
         os.environ["API_KEY"] = "secret"

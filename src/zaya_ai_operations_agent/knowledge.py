@@ -7,6 +7,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any, Optional
 
+from .llm import LLMProviderFactory
 from .memory import MemoryStore
 from .orchestrator import AgentManager
 from .scheduler import Scheduler
@@ -70,9 +71,10 @@ class VectorStore:
 class KnowledgeManager:
     """Modular knowledge base manager with ingestion, chunking, metadata, and search."""
 
-    def __init__(self, memory_store: Optional[MemoryStore] = None, embedding: Optional[EmbeddingInterface] = None, vector_store: Optional[VectorStore] = None, scheduler: Optional[Scheduler] = None, agent_manager: Optional[AgentManager] = None, workflow_manager: Optional[WorkflowManager] = None) -> None:
+    def __init__(self, memory_store: Optional[MemoryStore] = None, embedding: Optional[EmbeddingInterface] = None, vector_store: Optional[VectorStore] = None, scheduler: Optional[Scheduler] = None, agent_manager: Optional[AgentManager] = None, workflow_manager: Optional[WorkflowManager] = None, llm_provider: Optional[Any] = None) -> None:
         self.memory_store = memory_store
         self.embedding = embedding or SimpleEmbedding()
+        self.llm_provider = llm_provider or LLMProviderFactory.create()
         self.vector_store = vector_store or VectorStore()
         self.scheduler = scheduler or Scheduler()
         self.agent_manager = agent_manager

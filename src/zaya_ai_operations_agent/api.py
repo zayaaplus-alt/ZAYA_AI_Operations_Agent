@@ -50,6 +50,7 @@ from .agent import Agent
 from .config import Settings
 from .dashboard import build_dashboard_html
 from .knowledge import KnowledgeManager
+from .llm import LLMProviderFactory
 from .memory import MemoryStore
 from .orchestrator import AgentManager
 from .scheduler import Scheduler
@@ -306,6 +307,20 @@ def list_knowledge_documents(request: Any = None) -> list[dict[str, Any]]:
     memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
     manager = KnowledgeManager(memory_store=memory_store)
     return manager.list_documents()
+
+
+@app.get("/llm/providers")
+def list_llm_providers(request: Any = None) -> list[dict[str, str]]:
+    require_access("knowledge", request)
+    settings = Settings()
+    provider_settings = LLMProviderFactory.load_settings(settings)
+    return [
+        {"name": "mock", "active": provider_settings.provider == "mock"},
+        {"name": "openai", "active": provider_settings.provider == "openai"},
+        {"name": "anthropic", "active": provider_settings.provider == "anthropic"},
+        {"name": "gemini", "active": provider_settings.provider == "gemini"},
+        {"name": "ollama", "active": provider_settings.provider == "ollama"},
+    ]
 
 
 @app.delete("/knowledge/document/{document_id}")

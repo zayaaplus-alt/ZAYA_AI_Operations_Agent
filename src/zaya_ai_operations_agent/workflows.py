@@ -6,6 +6,7 @@ from pathlib import Path
 from typing import Any, Optional
 
 from .agent import Agent, ExecutionRecord
+from .llm import LLMProviderFactory
 from .memory import MemoryStore
 from .orchestrator import AgentManager
 from .scheduler import Scheduler
@@ -50,12 +51,12 @@ class WorkflowExecutionResult:
 class WorkflowManager:
     """Manages workflow definitions and their executions."""
 
-    def __init__(self, memory_store: Optional[MemoryStore] = None, scheduler: Optional[Scheduler] = None, agent_manager: Optional[AgentManager] = None) -> None:
+    def __init__(self, memory_store: Optional[MemoryStore] = None, scheduler: Optional[Scheduler] = None, agent_manager: Optional[AgentManager] = None, llm_provider: Optional[Any] = None) -> None:
         self.memory_store = memory_store
         self.scheduler = scheduler or Scheduler()
         self.agent_manager = agent_manager
         self._workflows: dict[str, Workflow] = {}
-        self.agent = Agent(memory_store=memory_store)
+        self.agent = Agent(memory_store=memory_store, llm_provider=llm_provider or LLMProviderFactory.create())
 
     def _get_memory(self) -> MemoryStore:
         if self.memory_store is None:
