@@ -7,6 +7,7 @@ from datetime import datetime, timedelta
 from typing import Callable, Optional
 
 from .tasks import Task, get_task
+from .tools import ToolExecutionManager, build_builtin_tools
 
 
 @dataclass(slots=True)
@@ -38,6 +39,7 @@ class Scheduler:
     def __init__(self) -> None:
         self._scheduled_tasks: list[ScheduledTask] = []
         self._lock = threading.RLock()
+        self.tool_manager = ToolExecutionManager(registry=build_builtin_tools())
 
     def schedule_task(
         self,

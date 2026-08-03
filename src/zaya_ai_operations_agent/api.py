@@ -55,6 +55,7 @@ from .memory import MemoryStore
 from .orchestrator import AgentManager
 from .scheduler import Scheduler
 from .tasks import TASK_REGISTRY, initialize_tasks
+from .tools import ToolExecutionManager, build_builtin_tools
 from .workflows import RetryPolicy, Workflow, WorkflowManager, WorkflowStep
 
 
@@ -321,6 +322,25 @@ def list_llm_providers(request: Any = None) -> list[dict[str, str]]:
         {"name": "gemini", "active": provider_settings.provider == "gemini"},
         {"name": "ollama", "active": provider_settings.provider == "ollama"},
     ]
+
+
+@app.get("/tools")
+def list_tools(request: Any = None) -> list[dict[str, Any]]:
+    require_access("knowledge", request)
+    registry = build_builtin_tools()
+    return [{"name": tool.name, "description": tool.description, "required_role": tool.required_role} for tool in registry.list_tools()]
+
+
+@app.post("/tools/run")
+def run_tool(request: Any = None, auth_request: Any = None) -> dict[str, Any]:
+    require_access("knowledge", auth_request or request)
+    payload = _get_json_payload(request)
+    tool_name = payload.get("tool_name")
+    arguments = payload.get("arguments", {}) or {}
+    role = payload.get("role", "viewer")
+    manager = ToolExecutionManager(registry=build_builtin_tools())
+    result = manager.execute(tool_name, arguments=arguments, role=role)
+    return {"name": result.name, "status": result.status, "output": result.output, "executed_at": result.executed_at, "metadata": result.metadata}
 
 
 @app.delete("/knowledge/document/{document_id}")

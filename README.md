@@ -239,6 +239,36 @@ curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/llm/providers
 
 Unit tests use a mock provider and do not make real external API calls.
 
+## Tool Calling Framework
+
+The project now includes a modular tool calling framework with a tool interface and registry for dynamic discovery.
+
+### Built-in tools
+
+- file operations for reading and writing files
+- HTTP request execution
+- restricted shell command execution
+- email placeholder interface
+- webhook sender
+
+### Permissions and audit logging
+
+Tool execution respects the existing role model. Viewer users can only run low-risk tools, while operator and admin users can access the broader set. Every tool run is also recorded in the tool audit log.
+
+### Tool API examples
+
+List available tools:
+
+```bash
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/tools
+```
+
+Run a tool:
+
+```bash
+curl -X POST http://127.0.0.1:8000/tools/run -H "Content-Type: application/json" -H "x-api-key: your-secret-key" -d '{"tool_name":"file-ops","arguments":{"path":"/tmp/example.txt","operation":"write","content":"hello"},"role":"operator"}'
+```
+
 ## Dashboard
 
 The API serves a lightweight HTML dashboard at / and /dashboard. It shows:

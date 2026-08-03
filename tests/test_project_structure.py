@@ -17,6 +17,7 @@ from zaya_ai_operations_agent.llm import AnthropicProvider, GeminiProvider, LLMP
 from zaya_ai_operations_agent.orchestrator import AgentManager
 from zaya_ai_operations_agent.scheduler import Scheduler
 from zaya_ai_operations_agent.tasks import TASK_REGISTRY, get_task, initialize_tasks
+from zaya_ai_operations_agent.tools import Tool, ToolExecutionManager, ToolRegistry, ToolResult, build_builtin_tools
 from zaya_ai_operations_agent.workflows import RetryPolicy, Workflow, WorkflowManager, WorkflowStep
 
 
@@ -335,6 +336,32 @@ class ProjectStructureTest(unittest.TestCase):
             request = type("Request", (), {"headers": {"x-api-key": "secret"}})()
             providers_response = self._get_route("GET", "/llm/providers")(request)
             self.assertGreaterEqual(len(providers_response), 5)
+        finally:
+            os.environ.pop("API_KEY", None)
+            os.environ.pop("API_ROLE", None)
+
+    def test_tool_registry_and_execution_manager(self) -> None:
+        registry = build_builtin_tools()
+        manager = ToolExecutionManager(registry=registry)
+        custom_tool = Tool(name="custom-tool", description="Custom", handler=lambda _args: ToolResult(name="custom-tool", status="success", output="ok", executed_at="now"))
+        registry.register(custom_tool)
+
+        result = manager.execute("custom-tool", arguments={}, role="operator")
+        self.assertEqual(result.status, "success")
+        self.assertEqual(len(registry.audit_log()), 1)
+
+        with self.assertRaises(PermissionError):
+            manager.execute("shell-command", arguments={"command": "echo hi"}, role="viewer")
+
+    def test_tool_api_endpoints(self) -> None:
+        os.environ["API_KEY"] = "secret"
+        os.environ["API_ROLE"] = "admin"
+        try:
+            request = type("Request", (), {"headers": {"x-api-key": "secret"}})()
+            tools_response = self._get_route("GET", "/tools")(request)
+            run_response = self._get_route("POST", "/tools/run")(type("Request", (), {"json": lambda self: {"tool_name": "file-ops", "arguments": {"path": "/tmp/test.txt", "operation": "write", "content": "hello"}, "role": "operator"}})(), request)
+            self.assertGreaterEqual(len(tools_response), 5)
+            self.assertEqual(run_response["status"], "success")
         finally:
             os.environ.pop("API_KEY", None)
             os.environ.pop("API_ROLE", None)
