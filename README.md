@@ -128,6 +128,59 @@ Run a multi-agent workflow:
 curl -X POST http://127.0.0.1:8000/agents/run -H "Content-Type: application/json" -H "x-api-key: your-secret-key" -d '{"task_name":"hello","user_role":"admin"}'
 ```
 
+## Workflow Engine
+
+The project now includes a modular workflow engine for composing multiple tasks into a single execution flow.
+
+Each workflow supports:
+
+- workflow name
+- ordered task list
+- conditional execution via `always`, `success`, or `failure`
+- retry policy with configurable max retries and retry delay
+
+### Example workflow
+
+```json
+{
+  "name": "ops-workflow",
+  "steps": [
+    {"task_name": "hello", "condition": "always"},
+    {"task_name": "system-info", "condition": "success"}
+  ],
+  "retry_policy": {
+    "max_retries": 1,
+    "retry_delay_seconds": 0
+  }
+}
+```
+
+### Workflow API examples
+
+Create a workflow:
+
+```bash
+curl -X POST http://127.0.0.1:8000/workflows -H "Content-Type: application/json" -H "x-api-key: your-secret-key" -d '{"name":"ops-workflow","steps":[{"task_name":"hello","condition":"always"}],"retry_policy":{"max_retries":1}}'
+```
+
+List workflows:
+
+```bash
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/workflows
+```
+
+Run a workflow:
+
+```bash
+curl -X POST http://127.0.0.1:8000/workflows/run -H "Content-Type: application/json" -H "x-api-key: your-secret-key" -d '{"workflow_name":"ops-workflow","user_role":"operator"}'
+```
+
+Inspect workflow execution history:
+
+```bash
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/workflows/history
+```
+
 ## Dashboard
 
 The API serves a lightweight HTML dashboard at / and /dashboard. It shows:

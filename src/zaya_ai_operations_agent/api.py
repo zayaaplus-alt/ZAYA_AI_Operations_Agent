@@ -53,13 +53,14 @@ from .memory import MemoryStore
 from .orchestrator import AgentManager
 from .scheduler import Scheduler
 from .tasks import TASK_REGISTRY, initialize_tasks
+from .workflows import RetryPolicy, Workflow, WorkflowManager, WorkflowStep
 
 
 ALLOWED_ROLES = {"admin", "operator", "viewer"}
 ROLE_PERMISSIONS = {
-    "admin": {"health", "tasks", "tasks/run", "history"},
-    "operator": {"health", "tasks", "tasks/run", "history"},
-    "viewer": {"health", "tasks", "history"},
+    "admin": {"health", "tasks", "tasks/run", "history", "workflows", "workflows/run"},
+    "operator": {"health", "tasks", "tasks/run", "history", "workflows", "workflows/run"},
+    "viewer": {"health", "tasks", "history", "workflows"},
 }
 
 
@@ -195,6 +196,81 @@ def delete_history(request: Any = None) -> dict[str, str]:
     return {"status": "deleted"}
 
 
+def _get_json_payload(request: Any = None) -> dict[str, Any]:
+    if request is None:
+        return {}
+    if hasattr(request, "json"):
+        json_payload = getattr(request, "json")
+        if callable(json_payload):
+            payload = json_payload()
+            if isinstance(payload, dict):
+                return payload
+        return {}
+    return getattr(request, "__dict__", {})
+
+
+@app.get("/workflows")
+def list_workflows(request: Any = None) -> list[dict[str, Any]]:
+    require_access("workflows", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = WorkflowManager(memory_store=memory_store)
+    workflows = manager.list_workflows()
+    return [
+        {
+            "name": workflow.name,
+            "steps": [{"task_name": step.task_name, "condition": step.condition} for step in workflow.steps],
+            "retry_policy": {"max_retries": workflow.retry_policy.max_retries, "retry_delay_seconds": workflow.retry_policy.retry_delay_seconds},
+        }
+        for workflow in workflows
+    ]
+
+
+@app.post("/workflows")
+def create_workflow(request: Any = None) -> dict[str, Any]:
+    require_access("workflows", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = WorkflowManager(memory_store=memory_store)
+    payload = _get_json_payload(request)
+    steps = [WorkflowStep(task_name=step.get("task_name", "hello"), condition=step.get("condition", "always")) for step in payload.get("steps", [])]
+    retry_policy = RetryPolicy(**payload.get("retry_policy", {})) if payload.get("retry_policy") else RetryPolicy()
+    workflow = Workflow(name=payload.get("name", "new-workflow"), steps=steps, retry_policy=retry_policy)
+    created = manager.create_workflow(workflow)
+    return {
+        "name": created.name,
+        "steps": [{"task_name": step.task_name, "condition": step.condition} for step in created.steps],
+        "retry_policy": {"max_retries": created.retry_policy.max_retries, "retry_delay_seconds": created.retry_policy.retry_delay_seconds},
+    }
+
+
+@app.post("/workflows/run")
+def run_workflow(request: Any = None) -> dict[str, Any]:
+    require_access("workflows/run", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = WorkflowManager(memory_store=memory_store)
+    payload = _get_json_payload(request)
+    workflow_name = payload.get("workflow_name") or payload.get("name") or "demo-workflow"
+    user_role = payload.get("user_role", "viewer")
+    result = manager.run_workflow(workflow_name, user_role=user_role)
+    return {
+        "workflow_name": result.workflow_name,
+        "status": result.status,
+        "step_results": result.step_results,
+        "executed_at": result.executed_at,
+    }
+
+
+@app.get("/workflows/history")
+def workflow_history(request: Any = None) -> list[dict[str, Any]]:
+    require_access("history", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = WorkflowManager(memory_store=memory_store)
+    return [record.__dict__ if hasattr(record, "__dict__") else {"task_name": record.task_name, "status": record.status, "user_role": getattr(record, "user_role", "viewer"), "execution_duration_seconds": getattr(record, "execution_duration_seconds", 0.0), "details": record.details, "executed_at": record.executed_at} for record in manager.history()]
+
+
 def _build_dashboard_html(request: Any = None) -> str:
     settings = Settings()
     memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
@@ -213,6 +289,14 @@ def _build_dashboard_html(request: Any = None) -> str:
         }
         for record in agent.history()[-5:]
     ]
+    workflow_manager = WorkflowManager(memory_store=memory_store)
+    workflows = [
+        {
+            "name": workflow.name,
+            "steps": [step.task_name for step in workflow.steps],
+        }
+        for workflow in workflow_manager.list_workflows()
+    ]
     return build_dashboard_html(
         {
             "status": "ok",
@@ -225,5 +309,6 @@ def _build_dashboard_html(request: Any = None) -> str:
             ],
             "scheduled_tasks": scheduled_tasks,
             "history": history,
+            "workflows": workflows,
         }
     )

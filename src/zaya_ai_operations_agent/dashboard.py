@@ -18,6 +18,10 @@ def build_dashboard_html(data: dict[str, Any]) -> str:
         f"<li>{html.escape(item['executed_at'])} - {html.escape(item['task_name'])} - {html.escape(item['status'])}</li>"
         for item in data.get("history", [])
     )
+    workflows = "".join(
+        f"<li>{html.escape(item['name'])}: {html.escape(', '.join(item.get('steps', [])))}</li>"
+        for item in data.get("workflows", [])
+    )
 
     return f"""<!DOCTYPE html>
 <html lang=\"en\">
@@ -52,6 +56,11 @@ def build_dashboard_html(data: dict[str, Any]) -> str:
   <section>
     <h2>Scheduled Tasks</h2>
     <ul>{scheduled or '<li>No scheduled tasks</li>'}</ul>
+  </section>
+
+  <section>
+    <h2>Workflow Definitions</h2>
+    <ul>{workflows or '<li>No workflows defined</li>'}</ul>
   </section>
 
   <section>

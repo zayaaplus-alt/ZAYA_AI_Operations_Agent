@@ -15,6 +15,7 @@ from zaya_ai_operations_agent.memory import MemoryStore
 from zaya_ai_operations_agent.orchestrator import AgentManager
 from zaya_ai_operations_agent.scheduler import Scheduler
 from zaya_ai_operations_agent.tasks import TASK_REGISTRY, get_task, initialize_tasks
+from zaya_ai_operations_agent.workflows import RetryPolicy, Workflow, WorkflowManager, WorkflowStep
 
 
 class ProjectStructureTest(unittest.TestCase):
@@ -232,6 +233,45 @@ class ProjectStructureTest(unittest.TestCase):
 
             self.assertGreaterEqual(len(agents_response), 3)
             self.assertEqual(run_response["status"], "success")
+        finally:
+            os.environ.pop("API_KEY", None)
+            os.environ.pop("API_ROLE", None)
+
+    def test_workflow_manager_runs_multi_step_workflow_with_retries(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            memory_store = MemoryStore(Path(temp_dir) / "memory.json")
+            manager = WorkflowManager(memory_store=memory_store)
+            workflow = Workflow(
+                name="demo-workflow",
+                steps=[
+                    WorkflowStep(task_name="hello", condition="always"),
+                    WorkflowStep(task_name="system-info", condition="success"),
+                ],
+                retry_policy=RetryPolicy(max_retries=1),
+            )
+            manager.create_workflow(workflow)
+            result = manager.run_workflow("demo-workflow", user_role="operator")
+
+            self.assertEqual(result.workflow_name, "demo-workflow")
+            self.assertEqual(result.status, "success")
+            self.assertEqual(len(result.step_results), 2)
+            self.assertIsNotNone(manager.get_workflow("demo-workflow"))
+            self.assertGreaterEqual(len(manager.history()), 1)
+
+    def test_workflow_api_endpoints(self) -> None:
+        os.environ["API_KEY"] = "secret"
+        os.environ["API_ROLE"] = "admin"
+        try:
+            request = type("Request", (), {"headers": {"x-api-key": "secret"}, "json": lambda self: {"name": "workflow-api", "steps": [{"task_name": "hello", "condition": "always"}], "retry_policy": {"max_retries": 1}}})()
+            workflows_response = self._get_route("GET", "/workflows")(request)
+            create_response = self._get_route("POST", "/workflows")(request)
+            run_response = self._get_route("POST", "/workflows/run")(request)
+            workflow_history_response = self._get_route("GET", "/workflows/history")(request)
+
+            self.assertIsInstance(workflows_response, list)
+            self.assertEqual(create_response["name"], "workflow-api")
+            self.assertEqual(run_response["status"], "success")
+            self.assertIsInstance(workflow_history_response, list)
         finally:
             os.environ.pop("API_KEY", None)
             os.environ.pop("API_ROLE", None)
