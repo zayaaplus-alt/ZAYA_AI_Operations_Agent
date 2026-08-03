@@ -150,6 +150,18 @@ View history:
 curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/history
 ```
 
+View history for one task:
+
+```bash
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/history/hello
+```
+
+Delete history (admin only):
+
+```bash
+curl -X DELETE -H "x-api-key: your-secret-key" http://127.0.0.1:8000/history
+```
+
 ### Roles
 
 - admin: can access all endpoints

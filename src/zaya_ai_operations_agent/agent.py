@@ -18,6 +18,8 @@ class ExecutionRecord:
     task_name: str
     executed_at: str
     status: str
+    user_role: str = "viewer"
+    execution_duration_seconds: float = 0.0
     details: str = ""
 
 
@@ -37,13 +39,18 @@ class Agent:
     def plan(self, task_name: str) -> list[str]:
         return [task_name]
 
-    def execute(self, task_name: str) -> ExecutionRecord:
+    def execute(self, task_name: str, user_role: str = "viewer", execution_duration_seconds: float = 0.0) -> ExecutionRecord:
         task: Task = get_task(task_name)
+        started_at = datetime.now()
         task.run()
+        completed_at = datetime.now()
+        duration = execution_duration_seconds or (completed_at - started_at).total_seconds()
         record = ExecutionRecord(
             task_name=task_name,
-            executed_at=datetime.now().isoformat(),
+            executed_at=completed_at.isoformat(),
             status="completed",
+            user_role=user_role,
+            execution_duration_seconds=round(duration, 3),
             details=f"Executed task '{task_name}'",
         )
         self._history.append(record)
@@ -59,6 +66,14 @@ class Agent:
         if stored_history and not self._history:
             self._history = [ExecutionRecord(**entry) for entry in stored_history]
         return list(self._history)
+
+    def history_for_task(self, task_name: str) -> list[ExecutionRecord]:
+        return [record for record in self.history() if record.task_name == task_name]
+
+    def clear_history(self) -> None:
+        self._history = []
+        memory = self._get_memory()
+        memory.set("agent_history", [])
 
     def export_history(self, output_path: Path) -> Path:
         history_data = [asdict(record) for record in self.history()]

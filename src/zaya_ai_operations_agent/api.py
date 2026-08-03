@@ -33,6 +33,13 @@ except ImportError:  # pragma: no cover - exercised when dependency is unavailab
 
             return decorator
 
+        def delete(self, path: str):
+            def decorator(func):
+                self.routes.append(("DELETE", path, func))
+                return func
+
+            return decorator
+
     class HTTPException(Exception):
         def __init__(self, status_code: int, detail: str):
             super().__init__(detail)
@@ -122,4 +129,25 @@ def history(request: Any = None) -> list[dict[str, Any]]:
     settings = Settings()
     memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
     agent = Agent(memory_store=memory_store)
-    return [record.__dict__ if hasattr(record, "__dict__") else {"task_name": record.task_name, "status": record.status, "details": record.details, "executed_at": record.executed_at} for record in agent.history()]
+    return [record.__dict__ if hasattr(record, "__dict__") else {"task_name": record.task_name, "status": record.status, "user_role": getattr(record, "user_role", "viewer"), "execution_duration_seconds": getattr(record, "execution_duration_seconds", 0.0), "details": record.details, "executed_at": record.executed_at} for record in agent.history()]
+
+
+@app.get("/history/{task_name}")
+def history_for_task(task_name: str, request: Any = None) -> list[dict[str, Any]]:
+    require_access("history", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    agent = Agent(memory_store=memory_store)
+    return [record.__dict__ if hasattr(record, "__dict__") else {"task_name": record.task_name, "status": record.status, "user_role": getattr(record, "user_role", "viewer"), "execution_duration_seconds": getattr(record, "execution_duration_seconds", 0.0), "details": record.details, "executed_at": record.executed_at} for record in agent.history_for_task(task_name)]
+
+
+@app.delete("/history")
+def delete_history(request: Any = None) -> dict[str, str]:
+    _, role = _get_request_context(request)
+    if role != "admin":
+        raise HTTPException(status_code=403, detail="Only admin can delete history")
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    agent = Agent(memory_store=memory_store)
+    agent.clear_history()
+    return {"status": "deleted"}

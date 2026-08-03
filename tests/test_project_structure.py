@@ -164,6 +164,27 @@ class ProjectStructureTest(unittest.TestCase):
             os.environ.pop("API_KEY", None)
             os.environ.pop("API_ROLE", None)
 
+    def test_history_endpoints_and_admin_delete(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            memory_path = Path(temp_dir) / "memory.json"
+            os.environ["MEMORY_FILE"] = str(memory_path)
+            os.environ["API_KEY"] = "secret"
+            os.environ["API_ROLE"] = "admin"
+            try:
+                request = type("Request", (), {"headers": {"x-api-key": "secret"}})()
+                app.routes[2][2](type("Request", (), {"task_name": "hello"})(), request)
+                history_response = app.routes[3][2](request)
+                task_history_response = app.routes[4][2]("hello", request)
+                delete_response = app.routes[5][2](request)
+
+                self.assertGreaterEqual(len(history_response), 1)
+                self.assertGreaterEqual(len(task_history_response), 1)
+                self.assertEqual(delete_response["status"], "deleted")
+            finally:
+                os.environ.pop("MEMORY_FILE", None)
+                os.environ.pop("API_KEY", None)
+                os.environ.pop("API_ROLE", None)
+
     def test_viewer_cannot_execute_tasks(self) -> None:
         os.environ["API_KEY"] = "secret"
         os.environ["API_ROLE"] = "viewer"
