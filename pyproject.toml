@@ -1,0 +1,20 @@
+[project]
+name = "zaya-ai-operations-agent"
+version = "0.1.0"
+description = "A modular Python AI Operations Agent project scaffold"
+readme = "README.md"
+requires-python = ">=3.10"
+dependencies = []
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0"]
+
+[project.scripts]
+zaya-ai-operations-agent = "zaya_ai_operations_agent:main"
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+
+[build-system]
+requires = ["uv_build>=0.12.1,<0.13.0"]
+build-backend = "uv_build"
