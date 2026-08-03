@@ -26,12 +26,27 @@ Example:
 cp .env.example .env
 ```
 
+## Task System
+
+Tasks are registered through a lightweight plugin model. New tasks can be added by creating a new module in the tasks_plugins package and exposing a registration function. The CLI discovers tasks from that package automatically, so no changes to cli.py are required.
+
+Built-in example tasks:
+
+- hello: prints a friendly greeting
+- system-info: prints basic system information
+
 ## Usage
 
-Run the default task:
+Run the hello task:
 
 ```bash
 python -m zaya_ai_operations_agent.cli run --task hello
+```
+
+Run the system-info task:
+
+```bash
+python -m zaya_ai_operations_agent.cli run --task system-info
 ```
 
 Or via the installed script:

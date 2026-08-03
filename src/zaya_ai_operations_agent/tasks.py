@@ -1,6 +1,8 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
+from importlib import import_module
+from pathlib import Path
 from typing import Callable, Optional
 
 
@@ -21,18 +23,29 @@ class Task:
 TASK_REGISTRY: dict[str, Task] = {}
 
 
-def create_hello_task() -> Task:
-    def handler() -> None:
-        print("Hello from the AI Operations Agent")
+def _discover_plugins() -> list[Callable[[dict[str, Task]], None]]:
+    plugin_package = import_module("zaya_ai_operations_agent.tasks_plugins")
+    plugin_modules = [
+        import_module(f"{plugin_package.__name__}.{path.stem}")
+        for path in Path(plugin_package.__file__).parent.glob("*.py")
+        if path.name != "__init__.py"
+    ]
 
-    return Task(name="hello", description="Print a friendly greeting", handler=handler)
+    register_functions: list[Callable[[dict[str, Task]], None]] = []
+    for module in plugin_modules:
+        register_func = getattr(module, "register_" + module.__name__.split(".")[-1] + "_task", None)
+        if callable(register_func):
+            register_functions.append(register_func)
+
+    return register_functions
 
 
 def initialize_tasks() -> dict[str, Task]:
-    """Populate the task registry with built-in tasks."""
+    """Populate the task registry with built-in tasks discovered from plugins."""
 
     TASK_REGISTRY.clear()
-    TASK_REGISTRY["hello"] = create_hello_task()
+    for register_task in _discover_plugins():
+        register_task(TASK_REGISTRY)
     return TASK_REGISTRY
 
 

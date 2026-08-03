@@ -49,6 +49,17 @@ class ProjectStructureTest(unittest.TestCase):
 
             self.assertIn("Hello from the AI Operations Agent", output.getvalue())
 
+    def test_run_task_executes_system_info_task(self) -> None:
+        with TemporaryDirectory() as temp_dir:
+            settings = Settings(data_dir=Path(temp_dir), memory_file=Path(temp_dir) / "memory.json")
+            output = StringIO()
+
+            with redirect_stdout(output):
+                run_task("system-info", settings=settings)
+
+            self.assertIn("System Information", output.getvalue())
+            self.assertIn("system:", output.getvalue())
+
     def test_settings_loads_values_from_env_file(self) -> None:
         with TemporaryDirectory() as temp_dir:
             env_file = Path(temp_dir) / ".env"
