@@ -119,29 +119,42 @@ uvicorn zaya_ai_operations_agent.api:app --reload
 
 ### API usage examples
 
+Set the following values in your .env file before using the API:
+
+```bash
+API_KEY=your-secret-key
+API_ROLE=admin
+```
+
 Check health:
 
 ```bash
-curl http://127.0.0.1:8000/health
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/health
 ```
 
 List tasks:
 
 ```bash
-curl http://127.0.0.1:8000/tasks
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/tasks
 ```
 
 Run a task:
 
 ```bash
-curl -X POST http://127.0.0.1:8000/tasks/run -H "Content-Type: application/json" -d '{"task_name":"hello"}'
+curl -X POST http://127.0.0.1:8000/tasks/run -H "Content-Type: application/json" -H "x-api-key: your-secret-key" -d '{"task_name":"hello"}'
 ```
 
 View history:
 
 ```bash
-curl http://127.0.0.1:8000/history
+curl -H "x-api-key: your-secret-key" http://127.0.0.1:8000/history
 ```
+
+### Roles
+
+- admin: can access all endpoints
+- operator: can access all endpoints except some administrative actions if added later
+- viewer: can access read-only endpoints such as /health, /tasks, and /history
 
 ## Usage
 

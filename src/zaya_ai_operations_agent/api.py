@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -44,6 +45,14 @@ from .memory import MemoryStore
 from .tasks import TASK_REGISTRY, initialize_tasks
 
 
+ALLOWED_ROLES = {"admin", "operator", "viewer"}
+ROLE_PERMISSIONS = {
+    "admin": {"health", "tasks", "tasks/run", "history"},
+    "operator": {"health", "tasks", "tasks/run", "history"},
+    "viewer": {"health", "tasks", "history"},
+}
+
+
 class TaskRunRequest(BaseModel):
     task_name: str
 
@@ -51,13 +60,39 @@ class TaskRunRequest(BaseModel):
 app = FastAPI(title="ZAYA AI Operations Agent API", version="0.1.0")
 
 
+def _get_request_context(request: Any = None) -> tuple[str, str]:
+    settings = Settings()
+    api_key = os.environ.get("API_KEY") or settings.openai_api_key or None
+    role = os.environ.get("API_ROLE") or "viewer"
+    if role not in ALLOWED_ROLES:
+        role = "viewer"
+    if request is not None:
+        headers = getattr(request, "headers", {}) or {}
+        provided_key = headers.get("x-api-key") if hasattr(headers, "get") else None
+        if provided_key is None:
+            provided_key = headers.get("X-API-Key") if hasattr(headers, "get") else None
+        if provided_key != api_key:
+            raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    elif api_key is None:
+        raise HTTPException(status_code=401, detail="Invalid or missing API key")
+    return api_key, role
+
+
+def require_access(path: str, request: Any = None) -> None:
+    _, role = _get_request_context(request)
+    if path not in ROLE_PERMISSIONS.get(role, set()):
+        raise HTTPException(status_code=403, detail="Access denied")
+
+
 @app.get("/health")
-def health() -> dict[str, str]:
+def health(request: Any = None) -> dict[str, str]:
+    require_access("health", request)
     return {"status": "ok"}
 
 
 @app.get("/tasks")
-def list_tasks() -> list[dict[str, str]]:
+def list_tasks(request: Any = None) -> list[dict[str, str]]:
+    require_access("tasks", request)
     initialize_tasks()
     return [
         {"name": name, "description": task.description}
@@ -66,7 +101,8 @@ def list_tasks() -> list[dict[str, str]]:
 
 
 @app.post("/tasks/run")
-def run_task(request: TaskRunRequest) -> dict[str, Any]:
+def run_task(request: TaskRunRequest, auth_request: Any = None) -> dict[str, Any]:
+    require_access("tasks/run", auth_request)
     settings = Settings()
     memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
     agent = Agent(memory_store=memory_store)
@@ -81,7 +117,8 @@ def run_task(request: TaskRunRequest) -> dict[str, Any]:
 
 
 @app.get("/history")
-def history() -> list[dict[str, Any]]:
+def history(request: Any = None) -> list[dict[str, Any]]:
+    require_access("history", request)
     settings = Settings()
     memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
     agent = Agent(memory_store=memory_store)

@@ -135,11 +135,14 @@ class ProjectStructureTest(unittest.TestCase):
             memory_path = Path(temp_dir) / "memory.json"
             settings = Settings(data_dir=Path(temp_dir), memory_file=memory_path)
             os.environ["MEMORY_FILE"] = str(memory_path)
+            os.environ["API_KEY"] = "test-key"
+            os.environ["API_ROLE"] = "admin"
             try:
-                health_response = app.routes[0][2]()
-                tasks_response = app.routes[1][2]()
-                run_response = app.routes[2][2](type("Request", (), {"task_name": "hello"})())
-                history_response = app.routes[3][2]()
+                request = type("Request", (), {"headers": {"x-api-key": "test-key"}})()
+                health_response = app.routes[0][2](request)
+                tasks_response = app.routes[1][2](request)
+                run_response = app.routes[2][2](type("Request", (), {"task_name": "hello"})(), request)
+                history_response = app.routes[3][2](request)
 
                 self.assertEqual(health_response["status"], "ok")
                 self.assertGreaterEqual(len(tasks_response), 1)
@@ -147,6 +150,30 @@ class ProjectStructureTest(unittest.TestCase):
                 self.assertGreaterEqual(len(history_response), 1)
             finally:
                 os.environ.pop("MEMORY_FILE", None)
+                os.environ.pop("API_KEY", None)
+                os.environ.pop("API_ROLE", None)
+
+    def test_api_rejects_missing_or_invalid_keys(self) -> None:
+        os.environ["API_KEY"] = "secret"
+        os.environ["API_ROLE"] = "viewer"
+        try:
+            request = type("Request", (), {"headers": {}})()
+            with self.assertRaises(Exception):
+                app.routes[0][2](request)
+        finally:
+            os.environ.pop("API_KEY", None)
+            os.environ.pop("API_ROLE", None)
+
+    def test_viewer_cannot_execute_tasks(self) -> None:
+        os.environ["API_KEY"] = "secret"
+        os.environ["API_ROLE"] = "viewer"
+        try:
+            request = type("Request", (), {"headers": {"x-api-key": "secret"}})()
+            with self.assertRaises(Exception):
+                app.routes[2][2](type("Request", (), {"task_name": "hello"})(), request)
+        finally:
+            os.environ.pop("API_KEY", None)
+            os.environ.pop("API_ROLE", None)
 
     def test_settings_uses_defaults_when_env_missing(self) -> None:
         with TemporaryDirectory() as temp_dir:
