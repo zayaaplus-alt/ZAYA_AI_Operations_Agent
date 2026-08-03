@@ -57,6 +57,7 @@ from .scheduler import Scheduler
 from .tasks import TASK_REGISTRY, initialize_tasks
 from .tools import ToolExecutionManager, build_builtin_tools
 from .workflows import RetryPolicy, Workflow, WorkflowManager, WorkflowStep
+from .workspaces import Organization, Project, User, UserManager, Workspace, WorkspaceManager
 
 
 ALLOWED_ROLES = {"admin", "operator", "viewer"}
@@ -329,6 +330,69 @@ def list_tools(request: Any = None) -> list[dict[str, Any]]:
     require_access("knowledge", request)
     registry = build_builtin_tools()
     return [{"name": tool.name, "description": tool.description, "required_role": tool.required_role} for tool in registry.list_tools()]
+
+
+@app.get("/organizations")
+def list_organizations(request: Any = None) -> list[dict[str, Any]]:
+    require_access("health", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = WorkspaceManager(memory_store=memory_store)
+    return [{"id": organization.id, "name": organization.name, "created_at": organization.created_at} for organization in manager.list_organizations()]
+
+
+@app.post("/organizations")
+def create_organization(request: Any = None) -> dict[str, Any]:
+    require_access("health", request)
+    payload = _get_json_payload(request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = WorkspaceManager(memory_store=memory_store)
+    organization = Organization(id=payload.get("id", f"org-{len(manager.list_organizations()) + 1}"), name=payload.get("name", "default-org"))
+    created = manager.create_organization(organization)
+    return {"id": created.id, "name": created.name, "created_at": created.created_at}
+
+
+@app.get("/workspaces")
+def list_workspaces(request: Any = None) -> list[dict[str, Any]]:
+    require_access("health", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = WorkspaceManager(memory_store=memory_store)
+    return [{"id": workspace.id, "name": workspace.name, "organization_id": workspace.organization_id, "created_at": workspace.created_at} for workspace in manager.list_workspaces()]
+
+
+@app.post("/workspaces")
+def create_workspace(request: Any = None) -> dict[str, Any]:
+    require_access("health", request)
+    payload = _get_json_payload(request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = WorkspaceManager(memory_store=memory_store)
+    workspace = Workspace(id=payload.get("id", f"workspace-{len(manager.list_workspaces()) + 1}"), name=payload.get("name", "default-workspace"), organization_id=payload.get("organization_id", "org-1"))
+    created = manager.create_workspace(workspace)
+    return {"id": created.id, "name": created.name, "organization_id": created.organization_id, "created_at": created.created_at}
+
+
+@app.get("/projects")
+def list_projects(request: Any = None) -> list[dict[str, Any]]:
+    require_access("health", request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = WorkspaceManager(memory_store=memory_store)
+    return [{"id": project.id, "name": project.name, "workspace_id": project.workspace_id, "permissions": project.permissions, "created_at": project.created_at} for project in manager.list_projects()]
+
+
+@app.post("/projects")
+def create_project(request: Any = None) -> dict[str, Any]:
+    require_access("health", request)
+    payload = _get_json_payload(request)
+    settings = Settings()
+    memory_store = MemoryStore(settings.memory_file or Path("~/.zaya_ai_operations_agent/memory.json").expanduser())
+    manager = WorkspaceManager(memory_store=memory_store)
+    project = Project(id=payload.get("id", f"project-{len(manager.list_projects()) + 1}"), name=payload.get("name", "default-project"), workspace_id=payload.get("workspace_id", "workspace-1"), permissions=payload.get("permissions", {}))
+    created = manager.create_project(project)
+    return {"id": created.id, "name": created.name, "workspace_id": created.workspace_id, "permissions": created.permissions, "created_at": created.created_at}
 
 
 @app.post("/tools/run")

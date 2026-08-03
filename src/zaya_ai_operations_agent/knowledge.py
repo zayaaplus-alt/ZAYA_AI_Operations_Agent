@@ -13,6 +13,7 @@ from .orchestrator import AgentManager
 from .scheduler import Scheduler
 from .tasks import get_task
 from .workflows import WorkflowManager
+from .workspaces import UserManager, WorkspaceManager
 
 
 @dataclass(slots=True)
@@ -75,6 +76,8 @@ class KnowledgeManager:
         self.memory_store = memory_store
         self.embedding = embedding or SimpleEmbedding()
         self.llm_provider = llm_provider or LLMProviderFactory.create()
+        self.user_manager = UserManager(memory_store=memory_store)
+        self.workspace_manager = WorkspaceManager(memory_store=memory_store)
         self.vector_store = vector_store or VectorStore()
         self.scheduler = scheduler or Scheduler()
         self.agent_manager = agent_manager

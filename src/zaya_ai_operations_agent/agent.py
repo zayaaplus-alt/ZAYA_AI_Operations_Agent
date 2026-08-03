@@ -11,6 +11,7 @@ from .memory import MemoryStore
 from .scheduler import Scheduler
 from .tasks import Task, get_task
 from .tools import ToolExecutionManager, build_builtin_tools
+from .workspaces import UserManager, WorkspaceManager
 
 
 @dataclass(slots=True)
@@ -33,6 +34,8 @@ class Agent:
         self.scheduler = scheduler or Scheduler()
         self.llm_provider = llm_provider or LLMProviderFactory.create()
         self.tool_manager = ToolExecutionManager(registry=build_builtin_tools())
+        self.user_manager = UserManager(memory_store=memory_store)
+        self.workspace_manager = WorkspaceManager(memory_store=memory_store)
         self._history: list[ExecutionRecord] = []
 
     def _get_memory(self) -> MemoryStore:

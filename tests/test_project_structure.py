@@ -19,6 +19,7 @@ from zaya_ai_operations_agent.scheduler import Scheduler
 from zaya_ai_operations_agent.tasks import TASK_REGISTRY, get_task, initialize_tasks
 from zaya_ai_operations_agent.tools import Tool, ToolExecutionManager, ToolRegistry, ToolResult, build_builtin_tools
 from zaya_ai_operations_agent.workflows import RetryPolicy, Workflow, WorkflowManager, WorkflowStep
+from zaya_ai_operations_agent.workspaces import Organization, Project, User, Workspace, WorkspaceManager
 
 
 class ProjectStructureTest(unittest.TestCase):
@@ -362,6 +363,38 @@ class ProjectStructureTest(unittest.TestCase):
             run_response = self._get_route("POST", "/tools/run")(type("Request", (), {"json": lambda self: {"tool_name": "file-ops", "arguments": {"path": "/tmp/test.txt", "operation": "write", "content": "hello"}, "role": "operator"}})(), request)
             self.assertGreaterEqual(len(tools_response), 5)
             self.assertEqual(run_response["status"], "success")
+        finally:
+            os.environ.pop("API_KEY", None)
+            os.environ.pop("API_ROLE", None)
+
+    def test_workspace_manager_supports_organizations_workspaces_and_projects(self) -> None:
+        manager = WorkspaceManager(memory_store=MemoryStore(Path("/tmp/zaya-workspaces-test.json")))
+        organization = manager.create_organization(Organization(id="org-1", name="Acme"))
+        workspace = manager.create_workspace(Workspace(id="ws-1", name="Ops", organization_id=organization.id))
+        project = manager.create_project(Project(id="proj-1", name="Launch", workspace_id=workspace.id, permissions={"default": "member"}))
+
+        self.assertEqual(organization.name, "Acme")
+        self.assertEqual(workspace.organization_id, organization.id)
+        self.assertEqual(project.workspace_id, workspace.id)
+        self.assertTrue(manager.has_project_permission("member", project, "read"))
+        self.assertFalse(manager.has_project_permission("viewer", project, "write"))
+
+    def test_workspace_api_endpoints(self) -> None:
+        os.environ["API_KEY"] = "secret"
+        os.environ["API_ROLE"] = "admin"
+        try:
+            request = type("Request", (), {"headers": {"x-api-key": "secret"}, "json": lambda self: {"name": "Acme", "id": "org-2"}})()
+            organizations_response = self._get_route("GET", "/organizations")(request)
+            create_org_response = self._get_route("POST", "/organizations")(request)
+            create_workspace_response = self._get_route("POST", "/workspaces")(type("Request", (), {"headers": {"x-api-key": "secret"}, "json": lambda self: {"name": "Ops", "id": "ws-2", "organization_id": create_org_response["id"]}})())
+            projects_response = self._get_route("GET", "/projects")(request)
+            create_project_response = self._get_route("POST", "/projects")(type("Request", (), {"headers": {"x-api-key": "secret"}, "json": lambda self: {"name": "Launch", "id": "proj-2", "workspace_id": create_workspace_response["id"], "permissions": {"default": "member"}}})())
+
+            self.assertIsInstance(organizations_response, list)
+            self.assertEqual(create_org_response["name"], "Acme")
+            self.assertEqual(create_workspace_response["name"], "Ops")
+            self.assertEqual(create_project_response["name"], "Launch")
+            self.assertIsInstance(projects_response, list)
         finally:
             os.environ.pop("API_KEY", None)
             os.environ.pop("API_ROLE", None)

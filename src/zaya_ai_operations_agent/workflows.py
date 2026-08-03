@@ -12,6 +12,7 @@ from .orchestrator import AgentManager
 from .scheduler import Scheduler
 from .tasks import Task, get_task
 from .tools import ToolExecutionManager, build_builtin_tools
+from .workspaces import UserManager, WorkspaceManager
 
 
 @dataclass(slots=True)
@@ -57,6 +58,8 @@ class WorkflowManager:
         self.scheduler = scheduler or Scheduler()
         self.agent_manager = agent_manager
         self.tool_manager = ToolExecutionManager(registry=build_builtin_tools())
+        self.user_manager = UserManager(memory_store=memory_store)
+        self.workspace_manager = WorkspaceManager(memory_store=memory_store)
         self._workflows: dict[str, Workflow] = {}
         self.agent = Agent(memory_store=memory_store, llm_provider=llm_provider or LLMProviderFactory.create())
 

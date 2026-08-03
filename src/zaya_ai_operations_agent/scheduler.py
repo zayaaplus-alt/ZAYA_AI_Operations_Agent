@@ -8,6 +8,7 @@ from typing import Callable, Optional
 
 from .tasks import Task, get_task
 from .tools import ToolExecutionManager, build_builtin_tools
+from .workspaces import UserManager, WorkspaceManager
 
 
 @dataclass(slots=True)
@@ -40,6 +41,8 @@ class Scheduler:
         self._scheduled_tasks: list[ScheduledTask] = []
         self._lock = threading.RLock()
         self.tool_manager = ToolExecutionManager(registry=build_builtin_tools())
+        self.user_manager = UserManager()
+        self.workspace_manager = WorkspaceManager()
 
     def schedule_task(
         self,
